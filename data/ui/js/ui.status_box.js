@@ -23,6 +23,8 @@ mode_backup: null,
 
 close_timeout: 10000,
 
+open_timeout: 700,
+
 is_closed: true,
 
 auto_complete_hlight_idx: 0,
@@ -74,12 +76,13 @@ function init () {
 
     $('#status_box').hover(
     function () {
-        ui.StatusBox.open();
+        ui.StatusBox.lazy_open();
     }, 
     function () {
-        ui.StatusBox.reset_close_countdown_timer();
+        ui.StatusBox.lazy_close();
     }).click(
-    function () {
+    function (event) {
+        ui.StatusBox.open();
         return false;
     });
 
@@ -183,8 +186,9 @@ function init () {
             return false;
         } 
         ui.StatusBox.auto_complete_hlight_idx = 0;
-
         ui.StatusBox.auto_complete(event);
+
+        ui.StatusBox.lazy_close()
         ui.StatusBox.update_status_len();
     });
     
@@ -199,11 +203,21 @@ function init () {
     $('#status_len').html('0/' + globals.max_status_len);
 },
 
-reset_close_countdown_timer:
-function reset_close_countdown_timer() {
+lazy_close:
+function lazy_close() {
     window.clearTimeout(ui.StatusBox.close_countdown_timer);
     ui.StatusBox.close_countdown_timer = window.setTimeout(
         ui.StatusBox.close, ui.StatusBox.close_timeout);
+},
+
+lazy_open:
+function lazy_open() {
+    if (ui.StatusBox.is_closed) {
+        window.clearTimeout(ui.StatusBox.close_countdown_timer);
+        window.clearTimeout(ui.StatusBox.open_countdown_timer);
+        ui.StatusBox.close_countdown_timer = window.setTimeout(
+            ui.StatusBox.open, ui.StatusBox.open_timeout);
+    }
 },
 
 change_mode:
