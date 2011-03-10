@@ -1,0 +1,56 @@
+if (typeof ui == 'undefined') var ui = {};
+ui.MessageDlg = {
+
+me: {},
+
+id: '',
+
+mask: {},
+
+is_show: false,
+
+TITLE_STR_ERROR: 'Ooops, an Error occurred!',
+
+init:
+function init () {
+    ui.MessageDlg.id = '#message_dlg';
+    ui.MessageDlg.me = $('#message_dlg');
+    ui.MessageDlg.mask = $('#dialog_mask');
+    // bind events
+    $(ui.MessageDlg.id).find('.dialog_close_btn').click(
+    function (event) {
+        ui.DialogHelper.close(ui.MessageDlg);
+    });
+
+    var btn_message_ok = new widget.Button('#btn_message_ok');
+    btn_message_ok.on_clicked = function (event) {
+        ui.DialogHelper.close(ui.MessageDlg);
+    };
+    btn_message_ok.create();
+
+    return this;
+},
+
+set_text:
+function set_text(title, content) {
+    $('#message_dlg_title').html(title);
+    $('#message_dlg_text').html(content);
+},
+
+hide:
+function hide () {
+    this.me.hide();
+    this.is_show = false;
+    return this;
+},
+
+show:
+function show () {
+    this.me.show();
+    this.is_show = true;
+    return this;
+},
+
+}
+
+
