@@ -1,0 +1,1615 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<title>Home | Hotot</title>
+    <link rel="stylesheet" href="css/hotot.widget.css" type="text/css" media="screen" /> 
+    <link rel="stylesheet" href="css/style.css" type="text/css" media="screen" /> 
+    <script type="text/javascript" src="js/jquery.js"></script>
+    <script type="text/javascript" src="js/jquery.layout.js"></script>
+    <script type="text/javascript" src="js/base64.js"></script>
+    <script type="text/javascript" src="js/sha1.js"></script>
+    <script type="text/javascript" src="js/lib.network.js"></script>
+    <script type="text/javascript" src="js/lib.twitterapi.js"></script>
+    <script type="text/javascript" src="js/js-oauth.js"></script>
+    
+    <script type="text/javascript" src="js/widget.button.js"></script>
+    <script type="text/javascript" src="js/widget.radio_group.js"></script>
+    <script type="text/javascript" src="js/widget.dialog.js"></script>
+    
+    <script type="text/javascript" src="js/util.js"></script>
+    <script type="text/javascript" src="js/console.js"></script>
+    <script type="text/javascript" src="js/db.js"></script>
+    <script type="text/javascript" src="js/conf.js"></script>
+    <script type="text/javascript" src="js/i18n.js"></script>
+    <script type="text/javascript" src="js/kismet.js"></script>
+    <script type="text/javascript" src="js/daemon.updater.js"></script>
+    <script type="text/javascript" src="js/ui.header.js"></script>
+    <script type="text/javascript" src="js/ui.status_box.js"></script>
+    <script type="text/javascript" src="js/ui.notification.js"></script>
+    <script type="text/javascript" src="js/ui.slider.js"></script>
+    <script type="text/javascript" src="js/ui.sidebar.js"></script>
+    <script type="text/javascript" src="js/ui.welcome.js"></script>
+    <script type="text/javascript" src="js/ui.template.js"></script>
+    <script type="text/javascript" src="js/ui.main.js"></script>
+    <script type="text/javascript" src="js/ui.home_tabs.js"></script>
+    <script type="text/javascript" src="js/ui.retweet_tabs.js"></script>
+    <script type="text/javascript" src="js/ui.mention_tabs.js"></script>
+    <script type="text/javascript" src="js/ui.dm_tabs.js"></script>
+    <script type="text/javascript" src="js/ui.people_tabs.js"></script>
+    <script type="text/javascript" src="js/ui.search_tabs.js"></script>
+    <script type="text/javascript" src="js/ui.pin_dlg.js"></script>
+    <script type="text/javascript" src="js/ui.prefs_dlg.js"></script>
+    <script type="text/javascript" src="js/ui.profile_dlg.js"></script>
+    <script type="text/javascript" src="js/ui.exts_dlg.js"></script>
+    <script type="text/javascript" src="js/ui.about_dlg.js"></script>
+    <script type="text/javascript" src="js/ui.form_checker.js"></script>
+    <script type="text/javascript" src="js/ui.finder.js"></script>
+    <script type="text/javascript" src="js/ui.action_menu.js"></script>
+    <script type="text/javascript" src="js/ui.context_menu.js"></script>
+    
+    <script type="text/javascript" src="ext/ext.js"></script>
+<script type="text/javascript">
+var layout_opts = {
+        closable:				true	
+    ,	resizable:				true	
+    ,	slidable:				true	
+    ,   paneClass: 'ui-layout-pane'
+    ,	north__slidable:		false
+    ,   north__closable:    true
+    ,   north__size:        50
+    ,   north__showOverflowOnHover:	true
+    ,   north__spacing_open :    0
+    ,   north__spacing_closed: 0
+    ,   north__initClosed: true
+    ,   east__spacing_open: 0
+    ,   east__spacing_closed: 0
+    ,   east__size:         0
+    ,   east__initClosed: true
+    ,   south__size:        48
+    ,   south__spacing_open: 0
+    ,   south__spacing_closed: 0
+    ,   south__initClosed: true
+    ,   north__paneSelector:    '#header'
+    ,   east__paneSelector:     '#aside'
+    ,   center__paneSelector:   '#center'
+    ,   south__paneSelector:    '#bottom'
+};
+
+function update_tweet_block_width() {
+    var view_width = $(window).width() - $('#aside').width();
+    ui.Slider.column_num = parseInt(view_width / 400) || 1;
+    globals.tweet_block_width = view_width / ui.Slider.column_num;
+    $(".tweet_block").width(globals.tweet_block_width);
+}
+
+function hotot_action(uri) {
+    if (util.is_native_platform()) {
+        alert('hotot:' + uri);
+    } 
+}
+
+function quit() {
+    conf.save_settings(function () {
+        conf.save_prefs(conf.current_name, function(){
+            if (conf.vars.platform == 'Chrome') {
+                chrome.tabs.getCurrent(function (tab) {
+                    chrome.tabs.remove(tab.id);    
+                });
+            } else {
+                hotot_action('system/quit');
+            }
+        });
+    });
+}
+
+function open_people(screen_name) {
+    ui.Notification.set('Lookup @'+screen_name+'... ').show();
+    ui.PeopleTabs.set_people(screen_name);
+    daemon.Updater.update_people();
+}
+
+function navigate_action(uri) {
+    if (util.is_native_platform()) {
+        window.location.href = uri;
+    } else {
+        window.open(uri); 
+    }
+}
+
+function hotot_notify(type, image, title, summary) {
+    if (conf.get_current_profile().preferences.use_native_notify) {
+        if (util.is_native_platform()) {
+            hotot_action('system/notify/'
+                + type
+                + '/' + encodeURIComponent(title)
+                + '/' + encodeURIComponent(summary)
+                + '/' + encodeURIComponent(image));
+        } else if (conf.vars.platform == 'Chrome') {
+            var img_url = image? image: 'image/ic64_hotot.png';
+            var notification = webkitNotifications.createNotification(
+              img_url, title, summary);
+            notification.show();
+            setTimeout(function() {notification.cancel()}, 5000);
+        }
+    } else {
+        // @TODO other notify way
+    }
+}
+
+function hotot_log(label, content) {
+    if (conf.settings.use_verbose_mode) {
+        if (util.is_native_platform()) {
+            hotot_action('action/log/' + encodeURIComponent(label) 
+                + '/' + encodeURIComponent(content));
+        } else if (conf.vars.platform == 'Chrome') {
+            console.log('[' + label + '] ' + content);
+        } else {
+            util.console.out('[' + label + '] ' + content);
+        }
+    }
+}
+
+/* 
+    = startup process =
+    - document.ready -> init() -> db.init() -> daemon.Updater.init()
+        -> conf.init() -> init_ui() -> ext.init() -> set loading flags
+    - native web container init -> on_load_finish() -> wait for loading flags being setted -> ext.init_exts() -> finish
+*/
+
+function init(callback) {
+    hotot_log('init', 'init()');
+    var procs = [];
+    procs.push(function() {
+        db.init(function () {
+            $(window).dequeue('_page_init');
+        });    
+    });
+    procs.push(function() {
+        daemon.Updater.init();
+        $(window).dequeue('_page_init');
+    });
+    procs.push(function() {
+        conf.init(function () {
+            $(window).dequeue('_page_init');
+        });    
+    });
+    procs.push(function() {
+        init_ui();
+        $(window).dequeue('_page_init');
+    });
+    procs.push(function() {
+        ext.init();
+        $(window).dequeue('_page_init');
+    });
+    procs.push(function() {
+        on_load_finish();
+        $(window).dequeue('_page_init');
+    });
+
+    $(window).queue('_page_init', procs);
+    $(window).dequeue('_page_init');
+}
+
+function init_dialogs() {
+    hotot_log('init', 'init_dialogs()');
+    globals.oauth_dialog = new widget.Dialog('#oauth_dlg');
+    globals.oauth_dialog.resize(350, 320);
+    globals.oauth_dialog.place(widget.DialogManager.CENTER);
+    globals.oauth_dialog.create();
+
+    globals.profile_dialog = new widget.Dialog('#profile_dlg');
+    globals.profile_dialog.resize(500, 400);
+    globals.profile_dialog.place(widget.DialogManager.CENTER);
+    globals.profile_dialog.create();
+
+    globals.prefs_dialog = new widget.Dialog('#prefs_dlg');
+    globals.prefs_dialog.resize(500, 400);
+    globals.prefs_dialog.place(widget.DialogManager.CENTER);
+    globals.prefs_dialog.create();
+
+    globals.exts_dialog = new widget.Dialog('#exts_dlg');
+    globals.exts_dialog.resize(500, 400);
+    globals.exts_dialog.place(widget.DialogManager.CENTER);
+    globals.exts_dialog.create();
+
+    globals.about_dialog = new widget.Dialog('#about_dlg');
+    globals.about_dialog.resize(500, 400);
+    globals.about_dialog.place(widget.DialogManager.CENTER);
+    globals.about_dialog.create();
+}
+
+function init_ui() {
+    hotot_log('init', 'init_ui()');
+    util.console.init();
+    kismet.init();
+    ui.Slider.init();
+    ui.Template.init();
+    ui.Header.init();
+    ui.StatusBox.init();
+    ui.Main.init();
+    ui.Welcome.init();
+    ui.HomeTabs.init();
+    ui.MentionTabs.init();
+    ui.RetweetTabs.init();
+    ui.DMTabs.init();
+    ui.PeopleTabs.init();
+    ui.SearchTabs.init();
+    ui.Notification.init();
+    ui.PinDlg.init();
+    ui.PrefsDlg.init();
+    ui.ProfileDlg.init();
+    ui.ExtsDlg.init();
+    ui.AboutDlg.init();
+    ui.Finder.init();
+    ui.ActionMenu.init();
+    ui.ContextMenu.init();
+    init_dialogs();
+}
+
+function overlay_variables(vars) {
+    conf.vars.platform = vars.platform;
+    hotot_log('init', 'overlay_variables()');
+    if (util.is_native_platform()) {
+        // native variables 
+        conf.vars.conf_dir = vars.conf_dir;
+        conf.vars.cache_dir = vars.cache_dir;
+        conf.vars.avatar_cache_dir = vars.avatar_cache_dir;
+        conf.settings.font_list = vars.extra_fonts;
+        ext.extras = vars.extra_exts;
+        i18n.locale = vars.locale;
+    }
+}
+
+function on_load_finish() {
+    // if native_platform
+    //      wait until the webview is ready.
+    if (util.is_native_platform() && globals.load_flags == 0) {
+        setTimeout(on_load_finish, 1000);
+    } else {
+        hotot_log('init', 'on_load_finish()');
+        globals.load_flags = 1;
+        // 1. load builtins & extra extensions
+        var procs = [];
+        procs.push(function () {
+            hotot_log('init', 'on_load_finish() -> ext.load_builtin_exts();');
+            ext.load_builtin_exts(function () {
+                $(window).dequeue('_on_load_finish');
+            });
+        });
+        procs.push(function() {
+            hotot_log('init', 'on_load_finish() -> ext.load_exts();');
+            ext.load_exts(ext.extras, function () {
+                $(window).dequeue('_on_load_finish');
+            });
+        });
+        // init enabled extensions
+        procs.push(function () {
+            hotot_log('init', 'on_load_finish() -> ext.init_exts();');
+            ext.init_exts();
+            $(window).dequeue('_on_load_finish');
+        });
+        
+        // 2. @TODO push settings to native platform
+        if (util.is_native_platform()) {
+            procs.push(function () {    
+                hotot_log('init', 'on_load_finish() -> push settings');
+                hotot_action('system/load_settings/' 
+                    + encodeURIComponent(JSON.stringify(conf.settings)))
+                globals.load_flags = 2;
+                $(window).dequeue('_on_load_finish');
+            });
+        } else {
+            procs.push(function () {    
+                hotot_log('init', 'on_load_finish() -> push settings');
+                $(window).width(conf.settings.size_w);
+                $(window).height(conf.settings.size_h);
+                globals.load_flags = 2;    
+                $(window).dequeue('_on_load_finish');
+            }); 
+        }
+        
+        // 3. i18n
+        procs.push(function() {
+            hotot_log('init', 'on_load_finish() -> i18n.init()');
+            i18n.init(function () {});
+            $(window).dequeue('_on_load_finish');
+        });
+        
+        // 4. finish, hide loading prompt
+        procs.push(function () {
+            $('#welcome_page_loading').fadeOut(function () {
+                hotot_log('init', 'done!');
+                $('#welcome_page_main').fadeIn();  
+                $(window).dequeue('_on_load_finish');
+            });
+        });
+        $(window).queue('_on_load_finish', procs);
+        $(window).dequeue('_on_load_finish');
+    }
+}
+
+var globals = {
+      tweet_block_width: 600
+    , max_status_len: 140
+    , trim_bound: 100
+    , tweet_font_size: 12
+    , myself: {}
+    , focus_input: false
+    , in_main_view: false
+    , load_flags: 0
+};
+
+jQuery(function($) {
+
+    globals.layout = $("#container").layout(layout_opts);
+    globals.layout.close("west");
+    globals.layout.close("south");
+
+    $(document).keyup(
+    function (event) {
+        if (event.shiftKey && !event.ctrlKey && !event.metaKey && !globals.focus_input) {
+            if (event.keyCode == 191) {
+                // '?' to open help & about dialog
+                globals.about_dialog.open();            
+            }
+        }
+        if (event.ctrlKey && event.keyCode == 81) {
+            // <Ctrl> + q to quit
+            quit();
+        } else {
+            if (globals.focus_input || !globals.in_main_view)
+                return
+            if (! ui.ActionMenu.is_hide) {
+                return ui.ActionMenu.handle_keyup(event.keyCode);
+            }
+
+            if (event.keyCode == 70 && event.ctrlKey) {
+                // '<Ctrl> + f' to open finder 
+                ui.Finder.show();
+            }
+            if (!event.shiftKey && !event.ctrlKey && !event.metaKey) {
+                if (event.keyCode == 116 || event.keyCode == 82) {
+                    // <F5> or 'r' to reload timeline
+                    ui.Notification.set('Loading Tweets...').show(-1);
+                    ui.Main.load_tweets([ui.Slider.current]);    
+                } else if (event.keyCode == 72) {
+                    // 'h' to slide to prev tab
+                    ui.Slider.slide_to_prev();
+                } else if (event.keyCode == 76) {
+                    // 'l' to slide to next tab
+                    ui.Slider.slide_to_next();
+                } else if (event.keyCode == 75) {
+                    // 'k' to move to prev tweet
+                    ui.Main.move_to_tweet("prev");
+                } else if (event.keyCode == 74) {
+                    // 'j' to move to next tweet
+                    ui.Main.move_to_tweet("next");
+                } else if (event.keyCode == 67) {
+                    // 'c' to compose
+                    ui.StatusBox.open();
+                } else if (event.keyCode == 84) {
+                    // 't' to move to top
+                    ui.Main.move_to_tweet("top");
+                } else if (event.keyCode == 66) {
+                    // 'b' to move to bottom
+                    ui.Main.move_to_tweet("bottom");
+                } else if (event.keyCode == 65) {
+                    // 'a' to open action menu
+                    ui.ActionMenu.show();
+                } else if (event.keyCode == 191) {
+                    // '/' to open finder
+                    ui.Finder.show();
+                } else if (event.keyCode == 120) {
+                    // <F9> to toggle sidebar
+                    ui.Sidebar.toggle();
+                }
+            }
+        }
+        return true;
+    });
+
+    $(document).click(
+    function (event) {
+        if (event.button == 0) {
+            ui.StatusBox.close();
+            ui.ContextMenu.hide();
+        }
+    });
+
+    document.getElementById('indication').onmousewheel = function (event) {
+        if (event.wheelDelta < 0){
+            ui.Slider.slide_to_next();
+        } else {
+            ui.Slider.slide_to_prev();
+        }
+    };
+
+    $("input").focus(function () {globals.focus_input = true;})
+        .blur(function () {globals.focus_input = false;});
+    $("textarea").focus(function () {globals.focus_input = true;})
+        .blur(function () {globals.focus_input = false;});
+
+    $(window).resize(
+    function () {
+        update_tweet_block_width();
+        if (globals.load_flags) {
+            if (globals.load_flags == 2) {
+                conf.settings.size_w = $(window).width();
+                conf.settings.size_h = $(window).height();
+                conf.save_settings()
+                ui.Slider.slide_to(ui.Slider.current);
+            }
+        }
+    });
+
+    $("#count").hover(
+    function () {
+        $("#count > ul").show();
+    },
+    function () {
+        $("#count > ul").hide();
+    });
+
+    init();
+
+    update_tweet_block_width();
+});
+</script>
+
+</head>
+<body>
+
+<div id="container">
+<header id="header">
+    <a id="btn_my_profile" class="profile_img_wrapper" href="javascript:void(0);">
+    </a>
+    <div id="version" class="version"></div>
+    <ul id="ctrl_panel">
+        <li>
+            <a id="btn_reload" class="panel_btn" href="javascript:void(0);" title="Reload timeline"></a>
+        </li>
+        <li id="btn_exts_menu_wrap">
+            <a id="btn_exts_menu" class="panel_btn" href="javascript:void(0);" title="Extensions ..."></a>
+            <ul id="exts_menu" class="hotot_menu">
+                <li id="exts_menu_empty_hint">
+                    <a href="javascript:void(0);">No Extension Icon</a>
+                </li>
+            </ul>
+        </li>
+        <li id="btn_hotot_wrap">
+            <a id="btn_hotot" class="panel_btn" href="javascript:void(0);" title="More ..."></a>
+            <ul id="hotot_menu" class="hotot_menu">
+            	<li>
+            		<a id="btn_prefs" href="javascript:void(0);">Preferences</a>
+            	</li>
+                <li>
+            		<a id="btn_exts" href="javascript:void(0);">Extensions</a>
+            	</li>
+            	<li>
+            		<a id="btn_about" href="javascript:void(0);">Help &amp; About</a>
+            	</li>
+                <li>
+            		<a id="btn_sign_out" href="javascript:void(0);">Sign out</a>
+            	</li>
+
+            </ul>
+        </li>
+    </ul>
+</header>
+
+<aside id="aside">
+</aside>
+
+<section id="center">
+<section id="welcome_page" class="page">
+    <h1 data-i18n-text="hotot">Hotot</h1>
+    <div id="welcome_page_main">
+    <ul id="profile_avator_list">
+        <li class="new_profile_item"><a id="btn_new_profile_item" title="Create a new profile" href="default"></a></li>
+    </ul>
+    <div id="sign_in_block">
+        <h2 id="profile_title" data-i18n-text="greeting">Greeting!</h2>
+        <div id="service_tabs">
+        <ul class="service_tabs_btns">
+            <li>
+            <a id="btn_service_twitter" service="twitter" href="#service_page_twitter" class="service_tabs_btn" title="Twitter">Twitter</a>
+            </li>
+            <li>
+            <a id="btn_service_identica" service="identica" href="#service_page_identica" class="service_tabs_btn" title="Identi.ca">Identi.ca</a>
+            </li>
+        </ul>
+        <div id="service_page_twitter" class="service_tabs_page">
+        <h3 data-i18n-text="sign_in_with_twitter">Sign in with Twitter</h3>
+        <p><br/></p>
+        <p>
+        <center>
+            <a id="btn_oauth_sign_in" class="button" title="Sign in with Twitter" data-i18n-title="sign_in_with_twitter" data-i18n-text="sign_in_with_twitter">Sign in with Twitter</a>
+        </center>
+        </p>
+        </div>
+
+        <div id="service_page_identica" class="service_tabs_page">
+        <p>
+            <label data-i18n-text="username">Username:</label><br/>
+            <input id="tbox_basic_auth_username" class="entry" style="width: 170px;" type="text" value=""/><br/>
+            <label data-i18n-text="password">Password:</label><br/>
+            <input id="tbox_basic_auth_password" class="entry" style="width: 170px;" type="password" value=""/><br/>
+            <input id="chk_remember_password" type="checkbox" class="checkbox" checked="1"/>
+            <label for="chk_remember_password" class="label" data-i18n-text="remember_password">Remember Password</label><br/>
+            <div style="text-align:right;margin-right:20px;">
+            <a id="btn_basic_auth_sign_in" class="button" data-i18n-text="sign_in">Sign In</a>
+            </div>
+        </p>
+        </div>
+
+        <div id="service_page_new" class="service_tabs_page">
+        <p>
+            <label data-i18n-text="profile_name">Profile Name:</label><br/>
+            <input id="tbox_new_profile_name" class="entry" style="width: 100px;" type="text" value=""/>
+            <label>@<span class="service_name"></span></label>
+            <div style="text-align:center;margin: 10px auto;">
+                <a id="btn_welcome_create_profile" class="button" title="Create a new Profile" data-i18n-title="create_profile" data-i18n-text="create_profile">Create Profile</a>
+            </div>
+        </p>
+        </div>
+        </div><!--tabs-->
+        <div class="bottom">
+            <a id="btn_welcome_delete_profile" href="javascript:void(0)" data-i18n-text="delete">Delete</a>
+            <a id="btn_welcome_prefs" href="javascript:void(0)" data-i18n-text="preferences">Preferences</a>     
+            <a id="btn_welcome_exts" href="javascript:void(0)" data-i18n-text="extensions">Extensions</a>
+        </div>
+    </div><!-- END of #sign_in_block -->
+    </div><!-- END of #welcome_page_main -->
+    <div id="welcome_page_loading">
+        <div class="inner">
+            <p><img src="image/ani_loading_bar.gif"/></p>
+            <p data-i18n-text="loading_resources_hint">Loading Resources ...</p>
+        </div>
+    </div>
+    <div id="welcome_bottom">
+        <p>
+        <a id="btn_welcome_about" href="javascript:void(0)" data-i18n-text="help">Help</a>
+        </p>
+    </div>
+</section>
+
+<section id="main_page" class="page">
+    <div id="main_page_slider">
+    <div id="home_timeline_tweet_block" 
+        name="#home_timeline" class="tweet_block">
+        <div class="tweet_block_top">
+            <center>
+            <ol id="home_radio_group" class="radio_group dark">
+                <li>
+                    <a class="radio_group_btn selected"
+                        href="#all" data-i18n-text="show_all">Show All</a>
+                </li><li>
+                    <a class="radio_group_btn"
+                        href="#public" data-i18n-text="public_only">Public Only</a>
+                </li><li>
+                    <a class="radio_group_btn"
+                        href="#conversation" data-i18n-text="conversation">Conversation</a>
+                </li>
+            </ol>
+            </center>
+        </div>
+        <ul></ul>
+        <div class="tweet_block_bottom">
+            <div class="load_more_info" data-i18n-text="load_more">Load more</div>
+        </div>
+    </div>
+    <div id="mentions_tweet_block"
+        name="#mentions" class="tweet_block">
+        <div class="tweet_block_top">
+            <center>
+            <ol id="mention_radio_group" class="radio_group dark">
+                <li>
+                    <a id="mention_all_btn"
+                        class="radio_group_btn selected"
+                        href="#all" data-i18n-text="show_all">Show All</a>
+                </li><li>
+                    <a id="mention_reply_btn" class="radio_group_btn"
+                        href="#reply" data-i18n-text="reply_only">Reply Only</a>
+                </li>
+            </ol>
+            </center>
+        </div>
+        <ul>
+        </ul>
+        <div class="tweet_block_bottom">
+            <div class="load_more_info" data-i18n-text="load_more">Load more</div>
+        </div>
+    </div>
+    <div id="direct_messages_tweet_block" 
+        name="#direct_messages" class="tweet_block">
+        <div class="tweet_block_top">
+            <center>
+            <ol id="dm_radio_group" class="radio_group dark">
+                <li>
+                    <a id="btn_dm_inbox" class="radio_group_btn selected"
+                        href="#direct_messages_inbox"
+                        data-i18n-text="inbox">Inbox</a>
+                </li><li>
+                    <a id="btn_dm_outbox" class="radio_group_btn"
+                        href="#direct_messages_outbox"
+                        data-i18n-text="outbox">Outbox</a>
+                </li>
+            </ol>
+            </center>
+        </div>
+        <div id="direct_messages_inbox_sub_block" class="tweet_sub_block">
+            <ul></ul>
+            <div class="tweet_block_bottom">
+                <div class="load_more_info">Press `R` to Load Direct Meassages</div>
+            </div>
+        </div>
+        <div id="direct_messages_outbox_sub_block" class="tweet_sub_block">
+            <ul></ul>
+            <div class="tweet_block_bottom">
+                <div class="load_more_info">Press `R` to Load Direct Meassages</div>
+            </div>
+        </div>
+    </div>
+    <div id="retweets_tweet_block" 
+        name="#retweets" class="tweet_block">
+        <div class="tweet_block_top">
+            <center>
+            <ol id="retweets_radio_group" class="radio_group dark">
+                <li>
+                    <a id="btn_retweeted_to_me" 
+                    class="radio_group_btn selected" 
+                    href="#retweeted_to_me"
+                    data-i18n-text="retweeted_by_others"
+                    >By Others</a>
+                </li><li>
+                    <a id="btn_retweeted_by_me" class="radio_group_btn"
+                    href="#retweeted_by_me"
+                    data-i18n-text="retweeted_by_me"
+                    >By Me</a>
+                </li><li>
+                    <a id="btn_retweets_of_me" class="radio_group_btn"
+                    href="#retweets_of_me"
+                    data-i18n-text="my_tweets_be_retweeted"
+                    >My Tweets, Retweeted</a>
+                </li>
+            </ol>
+            </center>
+        </div>
+        <div id="retweeted_by_me_sub_block" class="tweet_sub_block">
+            <ul></ul>
+            <div class="tweet_block_bottom">
+                <div class="load_more_info">Press `R` to Load Tweets</div>                
+            </div>
+        </div>
+        <div id="retweeted_to_me_sub_block" class="tweet_sub_block">
+            <ul></ul>
+            <div class="tweet_block_bottom">
+                <div class="load_more_info">Press `R` to Load Tweets</div>                
+            </div>
+        </div>
+        <div id="retweets_of_me_sub_block" class="tweet_sub_block">
+            <ul></ul>
+            <div class="tweet_block_bottom">
+                <div class="load_more_info">Press `R` to Load Tweets</div>                
+            </div>
+        </div>
+    </div>
+    <div id="people_tweet_block" 
+        name="#people" class="tweet_block">
+        <div class="tweet_block_top">
+            <div id="people_entry">
+                <label data-i18n-text="look_up">Look up:</label>
+                <input id="tbox_people_entry" type="text" class="entry dark" value=""/>
+                <a id="btn_people_entry" class="button dark">GO</a>
+            </div>
+            <div id="people_vcard" class="vcard">
+                <div class="profile_img_wrapper"></div>
+                <div class="vcard_body">
+                    <center>
+                    <ul id="people_vcard_radio_group" class="radio_group">
+                        <li><a class="radio_group_btn selected"
+                            href="#people_vcard_info_page"
+                            data-i18n-text="info"
+                            >INFO</a>
+                        </li><li>
+                            <a class="radio_group_btn" 
+                            href="#people_vcard_stat_page"
+                            data-i18n-text="stat"
+                            >STAT</a>
+                        </li>
+                    </ul>
+                    </center>
+                    <div id="people_vcard_tabs_pages">
+                    <table id="people_vcard_info_page" class="vcard_tabs_page" border="0" cellpadding="0" cellspacing="0">
+                        <tr><td data-i18n-text="name">Name: </td><td>
+                            <a class="screen_name" target="_blank" href="#"></a> 
+                            (<span class="name"></span>) </td>
+                        </tr>
+                        <tr><td data-i18n-text="bio">Bio: </td>
+                            <td><span class="bio"></span></td>
+                        </tr>
+                        <tr><td data-i18n-text="web">Web: </td>
+                            <td><a class="web" target="_blank" href="#" class="link"></a></td>
+                        </tr>
+                        <tr><td data-i18n-text="location">Location: </td>
+                            <td><span class="location"></span></td>
+                        </tr>
+                    </table>
+                    <table id="people_vcard_stat_page" class="vcard_tabs_page">
+                        <tr><td data-i18n-text="join_time">Join: </td>
+                            <td><span class="join"></span></td>
+                        </tr>
+                        <tr><td data-i18n-text="tweet_stat">Tweets: </td>
+                            <td><span class="tweet_cnt"></span>
+                            (<span class="tweet_per_day_cnt"></span> per day)</td>
+                        </tr>
+                        <tr><td data-i18n-text="follower_stat">Followers: </td>
+                            <td><span class="follower_cnt"></span></td>
+                        </tr>
+                        <tr><td data-i18n-text="friend_stat">Friends: </td>
+                            <td><span class="friend_cnt"></span></td>
+                        </tr>
+                        <tr><td data-i18n-text="relation">Relation: </td>
+                            <td><span class="relation"></span></td>
+                        </tr>
+                    </table>
+                    </div><!-- vcard tabs pages -->
+                </div> <!-- vcard body -->
+                <div id="people_vcard_ctrl">
+                    <ul id="people_vcard_action_btns">
+                    <li><a class="vcard_follow button"
+                            href="javascript:void(0);" 
+                            data-i18n-text="follow"
+                            >Follow</a>
+                    </li><li>
+                        <a class="vcard_block button"
+                            href="javascript:void(0);"
+                            data-i18n-text="block"
+                            >Block</a>
+                    </li><li>
+                        <a class="vcard_unblock button"
+                            href="javascript:void(0);"
+                            data-i18n-text="unblock"
+                            >Unblock</a>
+                    </li><li>
+                        <a class="vcard_edit button"
+                            href="javascript:void(0);"
+                            data-i18n-text="edit"
+                            >Edit</a>
+                    </li>
+                    </ul>
+                </div><!-- #people_vcard_ctrl -->
+            </div> <!-- vcard -->
+            <div id="people_radio_group_wrapper">
+                <center>
+                <ol id="people_radio_group" class="radio_group dark">
+                    <li>
+                    <a id="btn_people_tweet" class="radio_group_btn selected" href="#people_tweet" data-i18n-text="tweets">Tweets</a>
+                    </li><li>
+                    <a id="btn_people_fav" class="radio_group_btn" href="#people_fav" data-i18n-text="favs">Favs</a>
+                    </li><li>
+                    <a id="btn_people_followers" class="radio_group_btn" href="#people_followers" data-i18n-text="followers">Followers</a>
+                    </li><li>
+                    <a id="btn_people_friends" class="radio_group_btn" href="#people_friends" data-i18n-text="friends">Friends</a>
+                    </li>
+                </ol>
+                </center>
+            </div>
+        </div>
+        <div id="people_tweet_sub_block" class="tweet_sub_block">
+            <ul></ul>
+            <div class="tweet_block_bottom">
+                <div class="load_more_info"></div>                
+            </div>
+        </div>
+        <div id="people_fav_sub_block" class="tweet_sub_block">
+            <ul></ul>
+            <div class="tweet_block_bottom">
+                <div class="load_more_info">Specify A Name to Load People</div>
+            </div>
+        </div>        
+        <div id="people_followers_sub_block" class="tweet_sub_block">
+            <ul></ul>
+            <div class="tweet_block_bottom">
+                <div class="load_more_info">Specify A Name to Load People</div>
+            </div>
+        </div>
+        <div id="people_friends_sub_block" class="tweet_sub_block">
+            <ul></ul>
+            <div class="tweet_block_bottom">
+                <div class="load_more_info">Specify A Name to Load People</div>
+            </div>
+        </div>
+
+        <div id="people_request_hint">
+            <h1>
+            @<label id="request_screen_name"></label><span data-i18n-text="people_request_hint_title">has protected his/her tweets.</span>
+            </h1>
+            <p data-i18n-text="people_request_hint_text">
+            You need to go to twitter.com to send a request before you can start following this person...
+            </p>
+            <div style="text-align:center;">
+            <a id="btn_people_request" class="button" data-i18n-text="send_request" target="_blank">Send Request</a>
+            </div>
+        </div>
+        <div id="people_no_result_hint">
+            <p>
+            Your search - @<label class="keyword"></label> - did not match any people.
+            </p>
+            <p>
+            Suggestions: <br/>
+             - Make sure all words are spelled correctly.<br/>
+             - Try different people's name.<br/>
+             - Try search this token in search pane.<br/>
+            </p>
+        </div>
+
+    </div>
+    <div id="search_tweet_block" 
+        name="#search" class="tweet_block">
+        <div class="tweet_block_top">
+            <div id="search_entry">
+                <label data-i18n-text="search_for">Search for: </label>
+                <input id="tbox_search_entry" class="entry dark" type="text" value=""/>
+                <a id="btn_search_entry" class="button dark" data-i18n-text="search">Search</a>
+            </div>
+        </div>
+        <ul></ul>
+        <div id="search_no_result_hint">
+            <p>
+            <span data-i18n-text="search_no_result_hint_title1">Your search</span>
+            - <label class="keywords"></label> - 
+            <span data-i18n-text="search_no_result_hint_title2">did not match any result.</span>
+            </p>
+            <p>
+            <span data-i18n-text="suggestions">Suggestions</span>: <br/>
+             - <span data-i18n-text="search_no_result_hint_suggestion1">
+                Make sure all words are spelled correctly.</span><br/>
+             - <span data-i18n-text="search_no_result_hint_suggestion2">
+                Try different keywords.</span><br/>
+             - <span data-i18n-text="search_no_result_hint_suggestion3">
+                Try more general keywords.</span><br/>
+            </p>
+        </div>
+        <div class="tweet_block_bottom">
+            <div class="load_more_info">Specify Keywords to Search Tweets</div>
+        </div>
+    </div>
+    </div>
+    <ul id="tweet_bar">
+        <li><a id="tweet_reply_btn" class="tweet_bar_btn" title="Reply this tweet" href="javascript:void(0);" data-i18n-title="reply"></a></li>
+        <li><a id="tweet_retweet_btn" class="tweet_bar_btn" title="Official retweet this tweet" href="javascript:void(0);" data-i18n-title="retweet"></a></li>
+        <li><a id="tweet_dm_reply_btn" class="tweet_bar_btn" title="Reply Them" href="javascript:void(0);" data-i18n-title="reply"></a></li>
+        <li><a id="people_follow_btn" class="tweet_bar_btn" title="Follow Them" href="javascript:void(0);" data-i18n-title="follow"></a></li>
+        <li><a id="people_unfollow_btn" class="tweet_bar_btn" title="Unfollow Them" href="javascript:void(0);" data-i18n-title="unfollow"></a></li>
+        <li id="tweet_more_menu_trigger"><a id="tweet_more_menu_btn"  class="tweet_more tweet_bar_btn" href="javascript:void(0);"></a>
+            <ul id="tweet_more_menu" class="hotot_menu">
+            <li><a id="tweet_rt_btn" class="tweet_rt tweet_more_menu_btn" 
+                title="RT this tweet"
+                href="javascript:void(0);"
+                data-i18n-text="quote"
+                >Quote</a></li>
+            <li><a id="tweet_fav_btn" class="tweet_fav tweet_more_menu_btn" 
+                title="Fav it!" 
+                href="javascript:void(0);"
+                data-i18n-text="fav_or_unfav"
+                >Fav/Un-fav</a></li>
+            <li><a id="tweet_reply_all_btn"
+                class="tweet_reply_all tweet_more_menu_btn"
+                href="javascript:void(0);" 
+                title="Reply All"
+                data-i18n-text="reply_all"
+                >Reply All</a></li>
+            <li><a id="tweet_dm_btn" 
+                class="tweet_dm tweet_more_menu_btn"
+                href="javascript:void(0);" 
+                title="Send Message to them"
+                data-i18n-text="send_message"
+                >Send Message</a></li>
+            <li>
+                <a id="tweet_del_btn"
+                class="tweet_del tweet_more_menu_btn"
+                href="javascript:void(0);"
+                title="Delete this tweet"
+                data-i18n-text="delete"
+                >Delete</a>
+            </li>
+            <li class="separator"><span></span></li>
+            </ul>
+        </li>
+    </ul>
+</section>
+
+</section><!-- center -->
+
+<section id="bottom">
+    <div id="indication">
+        <ul>
+        	<li>
+        		<a id="idx_btn_home_timeline" class="idx_btn" href="#home_timeline" title="Home Timeline" data-i18n-title="home_timeline"><span class="ic_home"></span></a>
+                <span class="shape"></span>
+        	</li><li>
+        		<a id="idx_btn_mentions" class="idx_btn" href="#mentions" title="Mentions"><span class="ic_mention" data-i18n-title="mentions"></span></a>
+                <span class="shape"></span>
+        	</li><li>
+        		<a id="idx_btn_direct_messages" class="idx_btn" href="#direct_messages" title="Direct Messages" data-i18n-title="direct_messages"><span class="ic_dm"></span></a>
+                <span class="shape"></span>
+        	</li><li>
+        		<a id="idx_btn_retweets" class="idx_btn" href="#retweets" title="Retweets and Retweeted"><span class="ic_retweet"></span></a>
+                <span class="shape"></span>
+        	</li><li>
+        		<a id="idx_btn_people" class="idx_btn" href="#people" title="Find someone you love." data-i18n-title="find_someone_you_love"><span class="ic_people"></span></a>
+                <span class="shape"></span>
+        	</li><li class="stick_right">
+        		<a id="idx_btn_search" class="idx_btn" href="#search" title="Search for ... " data-i18n-title="search_for"><span class="ic_search"></span></a>
+                <span class="shape"></span>
+        	</li>
+        </ul>
+        <div id="indication_slot">
+            <div id="indication_slot_border"></div>
+            <div id="indication_light"></div>
+        </div>
+    </div>
+</section> <!-- bottom -->
+
+</div><!-- container -->
+        
+<section id="status_box" class="closed">
+    <span id="bubble_shape_shadow"></span>
+    <span id="bubble_shape"></span>
+
+    <div id="status_info">
+        <div id="status_info_text"></div>
+        <div id="dm_target">
+            <input type="text" id="tbox_dm_target" value="">
+        </div>
+        <a id="btn_clear_status_info" href="javascript:void(0);"></a>
+    </div>
+    <textarea id="tbox_status" class="textarea closed"></textarea>
+    <div id="status_ctrl">
+        <a id="toggle_mode" width="20" class="button" title="Click to compose message"></a>
+        <a id="btn_shorturl" class="button"  title="URL shortener"></a>
+        <a id="btn_clear" class="button" data-i18n-text="clear">Clear</a>
+        <a id="btn_update" class="button" data-i18n-text="update">Update</a>
+        <span class="clear"></span>
+        <div style="vertical-align:middle; padding-top: 5px;">
+            <label id="status_len"></label>
+            <label id="status_tips" data-i18n-text="press_ctrl_and_enter_to_update">Press Ctrl+Enter to Update</label>
+        </div>
+    </div>
+    <ul id="screen_name_auto_complete"></ul>
+</section> <!-- status_box -->
+
+<section id="notification_area">
+<span id="notification"></span>
+</section>
+
+<section id="finder_bar">
+    <div id="finder_wrapper">
+    <input type="text" class="entry" id="tbox_finder"/>
+    <label for="tbox_finder" class="label"
+        id="finder_matched_info"></label>
+    <a id="btn_finder_prev" href="javascript:void(0);"></a>
+    <a id="btn_finder_next" href="javascript:void(0);"></a>
+    <a id="btn_finder_close" href="javascript:void(0);"></a>
+    </div>
+</section>
+
+<section id="console">
+    <h1>Console</h1>
+    <div id="console_out">
+    </div>
+    <input id="console_in" type="text" value=""/>
+</section>
+
+<section id="dialog_mask">
+</section>
+<!--dialogs-->
+<!-- preferences dialog -->
+<div id="prefs_dlg" class="dialog">
+    <div class="dialog_bar">
+        <h2 class="dialog_title" data-i18n-text="preferences">Preferences</h2>
+        <a class="dialog_close_btn" href="javascript:void(0);"></a>
+    </div>
+    <div class="dialog_container">
+    <div class="dialog_header">
+        <ul id="prefs_dlg_btns" class="radio_group dark">
+            <li><a id="btn_prefs_global"
+                    href="#prefs_global" 
+                    class="radio_group_btn selected"
+                    data-i18n-text="globals">Globals</a>
+            </li><li><a id="btn_prefs_account"
+                    href="#prefs_account" 
+                    class="radio_group_btn"
+                    data-i18n-text="account">Account</a>
+            </li><li><a id="btn_prefs_appearance"
+                    href="#prefs_appearance" 
+                    class="radio_group_btn"
+                    data-i18n-text="look_and_feels">Looks &amp; Feels</a>
+            </li><li><a id="btn_prefs_advanced"
+                    href="#prefs_advanced" 
+                    class="radio_group_btn"
+                    data-i18n-text="advanced">Advanced</a>
+            </li>
+        </ul>
+    </div>
+    <div id="prefs_dlg_body" class="dialog_body">
+        <div id='prefs_global' class="prefs_dlg_page">
+            <div class="dialog_block hint"
+                data-i18n-text="globals_restart_hint">You MUST restart Hotot for some changes below to take effect.
+                And these options will affect ALL accounts
+            </div>
+            <div class="dialog_block">
+            <h3>- <span data-i18n-text="http_proxy">HTTP Proxy</span> -</h3>
+            <p>
+                <input id="chk_prefs_use_http_proxy" class="checkbox"
+                    title="Use HTTP Proxy" type="checkbox"/>
+                <label id="label_prefs_use_http_proxy" 
+                    for="chk_prefs_use_http_proxy"
+                    class="label" data-i18n-text="enable_proxy">
+                    Enable Proxy
+                </label><br/> 
+                <label class="label" data-i18n-text="host">Host</label>
+                <input id="tbox_prefs_http_proxy_host"
+                    title="HTTP Proxy Host" 
+                    style="width: 120px;" 
+                    type="text" class="entry"/>
+                <label class="label" data-i18n-text="port">Port</label>
+                <input id="tbox_prefs_http_proxy_port"
+                    title="HTTP Proxy Port" 
+                    style="width: 30px;"
+                    type="text" class="entry"/><br/>
+            </p>
+            </div>
+            <div class="dialog_block">
+            <h3>- <span data-i18n-text="keybinding">Keybinding</span> -</h3>
+            <p>
+                <label class="label" data-i18n-text="summon_hotot">Summon Hotot (like: &lt;ALT&gt;C)</label><br/>
+                <input id="tbox_prefs_shortcut_summon_hotot" 
+                     title="Summon Hot Key"
+                     type="text" class="entry"/><br/>
+            </p>
+            </div>
+            <div class="dialog_block">
+            <h3>- <span data-i18n-text>Misc</span> -</h3>
+            <p>
+                <input id="chk_prefs_use_verbose_mode"
+                    title="Enable verbose mode or not" 
+                    type="checkbox" class="checkbox"/>
+                <label for="chk_prefs_use_verbose_mode"
+                    class="label"
+                    data-i18n-text="enable_verbose_mode"
+                    >Enable verbose mode</label><br/>
+                <input id="chk_prefs_use_ubuntu_indicator"
+                    title="Use Ubuntu Indicator" 
+                    type="checkbox" class="checkbox"/>
+                <label for="chk_prefs_use_ubuntu_indicator" class="label"
+                    data-i18n-text="use_ubuntu_indicator"
+                    >Use Ubuntu indicator</label><br/>
+            </p>
+            </div>
+        </div><!-- END of #prefs_global -->
+        <div id='prefs_account' class="prefs_dlg_page">
+            <div class="dialog_block">
+            <h3>- <span data-i18n-text="twitter">Twitter</span> -</h3>
+            <p>
+                <label class="label" data-i18n-text="regain_access_token">Regain Access Token</label><br/>
+                <a id="btn_regain_token" class="button" title="Sign in with Twitter" data-i18n-title="sign_in_with_twitter" data-i18n-text="regain_access_token_with_twitter">Regain Access Token with Twitter</a>
+            </p>
+            </div>
+
+            <div class="dialog_block">
+            <h3>- <span data-i18n-text="identica">Identi.ca</span> -</h3>
+            <p>
+                <input id="chk_prefs_remember_password"
+                    type="checkbox" class="checkbox" 
+                    title="Remember Password" checked="1"/>
+                <label for="chk_prefs_remember_password" class="label"
+                    data-i18n-text="remember_password">Remember Password
+                </label><br/>
+            </p>
+            </div>
+        </div> <!-- END of #prefs_account -->
+        <div id='prefs_appearance' class="prefs_dlg_page">
+            <div class="dialog_block">
+            <h3>- <span data-i18n-text="font">Font</span> -</h3>
+            <p>
+                <label class="label"
+                    data-i18n-text="font_size">Font Size</label>
+                <input id="tbox_prefs_font_size" 
+                    title="Font Size" 
+                    style="width:100px" type="text" class="entry"/>
+                <label class="label" data-i18n-text="px">px</label><br/>
+                <input id="rdo_use_system_font" type="radio"
+                    class="radio" name="font" checked/>
+                <label class="label"
+                    data-i18n-text="system_font">System Font</label>
+                <select id="sel_prefs_font_family" class="combo"
+                    title="Font Family" style="width: 200px">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                </select><br/>
+                <input id="rdo_use_custom_font" type="radio" 
+                    class="radio" name="font" />
+                <label class="label"
+                    data-i18n-text="custom_font">Custom Font</label>
+                <input id="tbox_prefs_custom_font"
+                    title="Custom Font" 
+                    style="width:180px"
+                    type="text" class="entry"/><br/>
+            </p>
+            <p>
+                <div id="prefs_font_preview"
+                    data-i18n-text="font_preview_hint">The quick brown fox jumps over the lazy dog.</div>
+            </p>
+            </div>
+            <div class="dialog_block">
+            <h3>- <span data-i18n-text="behavior">Behavior</span> -</h3>
+            <p>
+                <input id="chk_prefs_use_native_notify" 
+                    title="Use Native Notify" class="checkbox"
+                    type="checkbox"/>
+                <label for="chk_prefs_use_native_notify" class="label"
+                    data-i18n-text="use_native_notify_system"
+                    >Use Native Notify System</label><br/>
+                <input id="chk_prefs_use_hover_box"
+                    title="Hover to open tweet box" class="checkbox"
+                    type="checkbox"/>
+                <label for="chk_prefs_use_hover_box" class="label"
+                    data-i18n-text="hover_to_open_tweet_box"
+                    >Hover to open tweet box</label><br/>
+                <input id="chk_prefs_use_preload_conversation" 
+                    title="Preload latest tweet in a conversation if it is cached." 
+                    class="checkbox"
+                    type="checkbox"/>
+                <label for="chk_prefs_use_preload_conversation"  
+                    class="label"
+                    data-i18n-text="preload_latest_tweets_in_conversations_if_possible"
+                    >Preload latest tweets in conversations if possible.</label><br/>
+            </p>
+            </div>
+            <div class="dialog_block">
+            <h3>- <span data-i18n-text="notification">Notification -</h3>
+            <p>
+                <table id="notification_table">
+                <tbody>
+                <tr><th data-i18n-text="page">Page</th><th data-i18n-text="notify">Notify</th><th data-i18n-text="type">Type</th><th data-i18n-text="sound">Sound</th></tr>
+                <tr><td data-i18n-text="home_timeline">Home</td>
+                    <td>
+                    <input id="chk_prefs_use_home_timeline_notify"
+                        title="Notify when home page has new tweets"
+                        class="checkbox"
+                        type="checkbox"/>
+                    </td>
+                    <td>
+                    <select 
+                    id="sel_prefs_use_home_timeline_notify_type"
+                    title="Type" style="width: 85px" class="combo">
+                        <option value="count" 
+                            data-i18n-text="count">count</option>
+                        <option value="content"
+                            data-i18n-text="content">content</option>
+                    </select> 
+                    </td>
+                    <td>
+                    <input id="chk_prefs_use_home_timeline_notify_sound"
+                        title="Play sound when home page has new tweets"
+                        class="checkbox"
+                        type="checkbox"/>             
+                    </td>
+                </tr>
+                <tr><td data-i18n-text="mentions">Mentions</td>
+                    <td>
+                    <input id="chk_prefs_use_mentions_notify"
+                        title="Notify when some new tweets mention me."
+                        class="checkbox"
+                        type="checkbox"/>
+                    </td>
+                    <td>
+                    <select 
+                    id="sel_prefs_use_mentions_notify_type"
+                    title="Type" style="width: 85px" class="combo">
+                        <option value="count" 
+                            data-i18n-text="count">count</option>
+                        <option value="content"
+                            data-i18n-text="content">content</option>
+                    </select> 
+                    </td>
+                    <td>
+                    <input id="chk_prefs_use_mentions_notify_sound"
+                        title="Play swhen some new tweets mention me."
+                        class="checkbox"
+                        type="checkbox"/>             
+                    </td>
+                </tr>
+                <tr><td data-i18n-text="direct_messages">Message</td>
+                    <td>
+                    <input id="chk_prefs_use_direct_messages_inbox_notify"
+                        title="Notify when some new direct messages coming." 
+                        class="checkbox"
+                        type="checkbox"/>
+                    </td>
+                    <td>
+            <select 
+            id="sel_prefs_use_direct_messages_inbox_notify_type"
+            title="Type" style="width: 85px" class="combo">
+                    <option value="count" 
+                        data-i18n-text="count">count</option>
+                    <option value="content"
+                        data-i18n-text="content">content</option>
+            </select> 
+                    </td>
+                    <td>
+                    <input id="chk_prefs_use_direct_messages_inbox_notify_sound"
+                        title="Play when some new direct messages coming." 
+                        class="checkbox"
+                        type="checkbox"/>             
+                    </td>
+                </tr>
+                </tbody>
+                </table>
+            </p>
+            </div>
+        </div><!-- END of prefs_appearance -->
+        <div id='prefs_advanced' class="prefs_dlg_page"> 
+            <div class="dialog_block">
+            <h3>- <span data-i18n-text="api_setting">API Settings</span> -</h3>
+            <p>
+                <label class="label" 
+                    data-i18n-text="api_base">API Base</label><br/>
+                <input id="tbox_prefs_api_base"
+                    title="API Base" type="text" class="entry"/><br/>
+                <input id="chk_prefs_use_same_sign_api_base"
+                    title="Use same Signing Api" class="checkbox"
+                    type="checkbox"/>
+                <label for="chk_prefs_use_same_sign_api_base"
+                    data-i18n-text="same_signing_api_base" class="label"
+                    >Same signing API base:
+                </label><br/>
+                <input id="tbox_prefs_sign_api_base"  
+                    title="Signing API Base"
+                    type="text" class="entry"/><br/>
+                <label class="label" data-i18n-text="oauth_base"
+                    >OAuth Base</label><br/>
+                <input id="tbox_prefs_oauth_base" 
+                    title="OAuth Base" type="text" class="entry"/><br/>
+                <input id="chk_prefs_use_same_sign_oauth_base"
+                    title="Use same Signing OAuth Base" 
+                    type="checkbox" class="checkbox"/>
+                <label for="chk_prefs_use_same_sign_oauth_base"
+                    class="label"
+                    data-i18n-text="same_signing_oauth_base"
+                    >Same signing OAuth base:
+                </label><br/>
+                <input id="tbox_prefs_sign_oauth_base"
+                    title="Signing OAuth Base"
+                    type="text" class="entry"/><br/>
+                <label class="label" 
+                    data-i18n-text="search_api_base"
+                    >Search API Base</label><br/>
+                <input id="tbox_prefs_search_api_base"
+                    title="Search API Base" 
+                    type="text" class="entry"/><br/>
+            </p>
+            </div>
+        </div><!-- END of prefs_advanced -->
+    </div>
+    <div class="dialog_footer">
+        <a id="btn_prefs_restore_defaults" class="button" data-i18n-text="restore_defaults">Restore Defaults</a>
+        <a id="btn_prefs_cancel" class="button" data-i18n-text="cancel">Cancel</a>
+        <a id="btn_prefs_ok" class="button" data-i18n-text="ok">OK</a>
+    </div>
+    </div> <!-- END of .dialog_container -->
+</div>
+
+<!-- oauth dialog -->
+<div id="oauth_dlg" class="dialog">
+    <div class="dialog_bar">
+        <h2 class="dialog_title">First time to Sign in with Twitter</h2>
+        <a class="dialog_close_btn" href="javascript:void(0);"></a>
+    </div>
+    <div class="dialog_container">
+    <div class="dialog_header"></div>
+    <div id="oauth_dlg_body" class="dialog_body">
+        <div class="dialog_block">
+        <h3>- <span data-i18n-text="step_one">Step 1</span> -</h3>
+        <p data-i18n-text="click_the_button_below">Click the button below </p>
+        <p style="text-align: center">
+        <a id="btn_oauth_user_auth" class="button" data-i18n-text="click_me_to_continue">
+            Click me to continue
+        </a>
+        </p>
+        <p data-i18n-text="or_copy_the_address_and_open_it_in_your_browser"
+            >Or copy the address and open it in your browser.</p>
+        <p style="text-align: center">
+        <input id="tbox_oauth_auth_url" type="text" class="entry" value=""/>
+        </p>
+        </div>
+        <div class="dialog_block">
+        <h3>- <span data-i18n-text="step_two">Step 2</span> -</h3>
+        <p data-i18n-text="copy_the_pin_code_and_paste_it_into_the_box_below"
+        >Copy the PIN Code and paste it into the box below</p>
+        <p style="text-align: center;">
+            <label class="label" 
+                data-i18n-text="pin_code">PIN Code:</label>
+            <br/>
+            <input id="tbox_oauth_pin" type="text" class="entry"/><br/>
+        </p>
+        </div>
+    </div>
+    <div class="dialog_footer">
+    <a id="btn_oauth_pin_cancel" class="button" href="javascript:void(0);" data-i18n-text="cancel">Cancel</a>
+    <a id="btn_oauth_pin_ok" class="button" href="javascript:void(0);" data-i18n-text="ok">OK</a>
+    </div>
+    </div><!-- END of .dialog_container -->
+</div>
+
+<!-- help & about dialog -->
+<div id="about_dlg" class="dialog">
+    <div class="dialog_bar">
+        <h2 class="dialog_title" data-i18n-text="about_and_help">About &amp; Help</h2>
+        <a class="dialog_close_btn" href="javascript:void(0);"></a>
+    </div>
+    <div class="dialog_container">
+    <div class="dialog_header">
+        <ul id="about_dlg_btns" class="radio_group dark">
+            <li><a id="btn_about_about"
+                    href="#about_about" 
+                    class="radio_group_btn selected"
+                    data-i18n-text="about">About</a>
+            </li><li><a id="btn_about_keyboard"
+                    href="#about_keyboard" 
+                    class="radio_group_btn"
+                    data-i18n-text="keyboard">Keyboard</a>
+            </li><li><a id="btn_about_credits"
+                    href="#about_credits" 
+                    class="radio_group_btn"
+                    data-i18n-text="credits">Credits</a>
+            </li><li><a id="btn_about_license"
+                    href="#about_license" 
+                    class="radio_group_btn"
+                    data-i18n-text="license">License</a>
+            </li>
+        </ul>
+    </div>
+    <div id="about_dlg_body" class="dialog_body">
+        <div id="about_about" class="about_dlg_page">
+            <div class="dialog_block">
+            <h3>- <span data-i18n-text="hotot">Hotot</span>
+                <span class="version"></span>-
+            </h3>
+            <p>
+            <strong data-i18n-text="hotot">Hotot</strong> is a lightweight client for the <a href="http://twitter.com">twitter</a> microblogging service.
+            </p>
+            <p style="text-align:center;">Copyright © 2009-2010 Shellex Wai</p>
+            <p>
+            Project Host: <a href="http://code.google.com/p/hotot">http://code.google.com/p/hotot/</a>
+            </p>
+            <p>Project Site: <a href="http://hotot.org">http://hotot.org</a></p>
+            </div>
+        </div>
+        <div id="about_keyboard" class="about_dlg_page">
+            <div class="dialog_block">
+            <h3>- <span data-i18n-text="keyboard_shortcuts">Keyboard shortcuts</span> -</h3>
+            <p>
+                <table id="shortcuts_table">
+                <tbody>
+                <tr><th>Action</th><th>Shortcut</th></tr>
+                <tr><th class="sub" colspan="2">Global</th></tr>
+                <tr><td>Quit Hotot</td><td>&lt;Ctrl&gt;q</td></tr>
+                <tr><td>Help</td><td>?</td></tr>
+
+                <tr><th class="sub" colspan="2">Tweet List</th></tr>
+                <tr><td>Reload</td><td>r</td></tr>
+                <tr><td>Slide to prev page</td><td>h</td></tr>
+                <tr><td>Slide to next page</td><td>l</td></tr>
+                <tr><td>Move to prev tweet</td><td>k</td></tr>
+                <tr><td>Move to next tweet</td><td>j</td></tr>
+                <tr><td>Move to top</td><td>t</td></tr>
+                <tr><td>Move to bottom</td><td>b</td></tr>
+                <tr><td>Toggle toolbar</td><td>&lt;Ctrl&gt; &lt;Up&gt;</td></tr>
+                <tr><td>Toggle nav tabs</td><td>&lt;Ctrl&gt; &lt;Down&gt;</td></tr>
+                <tr><td>Enter compose mode</td><td>c</td></tr>
+                <tr><td>Enter action mode</td><td>a</td></tr>
+                <tr><td>Enter finder mode</td><td>/ or &lt;Ctrl&gt;f</td></tr>
+                <tr><th class="sub" colspan="2">Compose Mode</th></tr>
+                <tr><td>Exit compose mode</td><td>&lt;ESC&gt;</td></tr>
+                <tr><th class="sub" colspan="2">Action Mode</th></tr>
+                <tr><td>Prev action</td><td>k</td></tr>
+                <tr><td>Next action</td><td>j</td></tr>
+                <tr><td>Trigger action</td><td>&lt;Tab&gt; or &lt;Enter&gt;  </td></tr>
+                <tr><td>Exit action mode</td><td>&lt;ESC&gt; or a</td></tr>
+                <tr><th class="sub" colspan="2">Finder Mode</th></tr>
+                <tr><td>Apply keywords</td><td>&lt;Enter&gt;</td></tr>
+                <tr><td>Exit finder mode</td><td>&lt;ESC&gt;</td></tr>
+                </tbody>
+                </table>
+            </p>
+            </div>
+        </div>
+        <div id="about_credits" class="about_dlg_page" style="overflow:auto;">
+            <div class="dialog_block">
+            <h3>- <span data-i18n-text="credits">Credits</span> -</h3>
+            <p>
+                <label>Written by</label>:<br/>
+                - Shellex Wai &lt;<a href="mailto:5h3ll3x@gmail.com">5h3ll3x@gmail.com</a>&gt; 
+                (<a href="http://twitter.com/shellex">@shellex</a>)<br/>
+
+                - Jiahua Huang &lt;<a href="mailto:jhuangjiahua@gmail.com">jhuangjiahua@gmail.com</a>&gt;
+                (<a href="http://twitter.com/shellexy">@shellexy</a>)<br/>
+                - Jimmy Xu &lt;<a href="mailto:xu.jimmy.wrk@gmail.com">xu.jimmy.wrk@gmail.com</a>&gt;
+                (<a href="http://twitter.com/jimmy_xu_wrk
+">@jimmy_xu_wrk</a>)<br/>
+
+                - Tualatrix Chou &lt;<a href="mailto:tualatrix@gmail.com">tualatrix@gmail.com</a>&gt;
+                (<a href="http://twitter.com/tualatrix">@tualatrix</a>)<br/>
+
+            </p>
+            <p>
+                <label>Artwork by</label>: <br/>
+                - Evan &lt;<a href="http://www.freemagi.com.com">www.freemagi.com</a>&gt; 
+                (<a href="http://twitter.com/OiCKilL">@OiCKilL</a>)<br/>
+                - Shellex Wai <br/>
+            </p>
+            <p>
+                <label>Document by</label>: <br/>
+                - Marguerite Su &lt;<a href="mailto:admin@doublechou.pp.ru">admin@doublechou.pp.ru</a>&gt; 
+                (<a href="http://twitter.com/doublechou">@doublechou</a>)<br/>
+
+            </p>
+            </div>
+        </div>
+        <div id="about_license" class="about_dlg_page">
+            <div class="dialog_block">
+            <h3>- <span data-i18n-text="license">License</span> -</h3>
+            <p>
+Hotot package is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+Licenseas published by the Free Software Foundation; either
+version3 of the License, or (at your option) any later version.
+            </p>
+            <p>
+This package is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+            </p>
+            <p>
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <a href="http://www.gnu.org/licenses/"/>http://www.gnu.org/licenses/</a>.
+            </p>
+            </div>
+        </div>
+    </div>
+    <div class="dialog_footer">
+    <a id="btn_about_ok" class="button" data-i18n-text="ok">OK</a>
+    </div>
+    </div><!-- END of .dialog_container -->
+</div>
+
+<!-- Profile dialog -->
+<div id="profile_dlg" class="dialog">
+    <div class="dialog_bar">
+        <h2 class="dialog_title">Profile</h2>
+        <a class="dialog_close_btn" href="javascript:void(0);"></a>
+    </div>
+    <div class="dialog_container">
+    <div class="dialog_header"></div>
+    <div id="profile_dlg_body" class="dialog_body">
+    <div style="float:left; width: 150px;">
+        <div class="dialog_block">
+        <h3>- Picture -</h3>
+        <p style="text-align:center; min-height:70px;">
+            <span id="profile_avator" class="profile_img_wrapper"></span>
+            <a id="btn_change_profile_avatar" class="button" style="display:none" data-i18n-text="change_avatar">Change avatar
+                <span class="placeholder"></span>            
+            </a>
+        </p>
+        </div>
+
+        <div class="dialog_block">
+        <h3>- Stat -</h3>
+        <p id="profile_stat">
+            <label class="label">Join: </label>
+            <span id="profile_join"></span><br/>
+            <label class="label">Tweets: </label>
+            <span id="profile_tweet_cnt"></span><br/>
+            <label class="label">Tweets per Day: </label>
+            <span id="profile_tweet_per_day_cnt"></span><br/>
+            <label class="label">Friends: </label>
+            <span id="profile_friend_cnt"></span><br/>
+            <label class="label">Followers: </label> 
+            <span id="profile_follower_cnt"></span><br/>
+            <label class="label">Favourites: </label>
+            <span id="profile_favourite_cnt"></span><br/>
+        </p>
+        </div>
+    </div>
+    <div>
+        <div class="dialog_block">
+        <h3>- <span data-i18n-text="information">Information</span> -</h3>
+        <p>
+            <label class="label">Name</label><br/>
+            <input id="tbox_profile_name" title="Name" type="text" class="entry"/><br/>
+            <label class="label">Location</label><br/>
+            <input id="tbox_profile_location" title="Location" type="text" class="entry"/><br/>
+            <label class="label">Website</label><br/>
+            <input id="tbox_profile_website" title="Website" type="text" class="entry"/><br/>
+            <label class="label">Bio</label><br/>
+            <textarea id="tbox_profile_bio" title="Bio" class="entry" style="height: 70px;"></textarea>
+        </p>
+        </div>
+    </div>
+    </div>
+    <div class="dialog_footer">
+    <a id="btn_profile_cancel" class="button" data-i18n-text="cancel">Cancel</a>
+    <a id="btn_profile_update" class="button" data-i18n-text="update">Update</a>
+    </div>
+    </div><!-- END of .dialog_container -->
+</div>
+
+<!-- Extensions dialog -->
+<div id="exts_dlg" class="dialog">
+    <div class="dialog_bar">
+        <h2 class="dialog_title" data-i18n-text="extensions">Extenstions</h2>
+        <a class="dialog_close_btn" href="javascript:void(0);"></a>
+    </div>
+    <div class="dialog_container">
+    <div class="dialog_header">
+        <ul id="exts_filter_btns" class="radio_group dark">
+            <li><a id="exts_filter_all_btn" href="#all"
+                class="radio_group_btn selected"
+                data-i18n-text="all">ALL</a>
+            </li><li>
+                <a id="exts_filter_enabled_btn" href="#enabled"
+                class="radio_group_btn"
+                data-i18n-text="enabled">Enabled</a>
+            </li><li>
+                <a id="exts_filter_disabled_btn" href="#disabled"
+                class="radio_group_btn"
+                data-i18n-text="disabled">Disabled</a>
+            </li>
+        </ul>
+    </div>
+    <div id="exts_container" class="dialog_body">
+        <ul>
+        </ul>
+    </div>
+    <div class="dialog_footer">
+    <a id="btn_exts_close" class="button" data-i18n-text="close">Close</a>
+    </div>
+    </div><!-- END of .dialog_container -->
+</div>
+
+<section id="action_menu">
+    <div id="action_menu_info"></div>
+    <ul class="hotot_menu">
+    </ul>
+</section>
+
+<section id="context_menu">
+    <ul class="hotot_menu">
+        <li><a id="context_menuitem_web_search" class="select_only" href="javascript:void(0);" data-i18n-text="search_in_google">Search in Google</a></li>
+        <li><a id="context_menuitem_twitter_search" class="select_only" href="javascript:void(0);" data-i18n-text="search_in_twitter">Search in Twitter</a></li>
+    </ul>
+</section>
+
+<span id="user_cache"></span>
+<span id="tweet_cache"></span>
+<audio id="audio_notify" src="../sound/notify.wav"></audio>
+<script>
+     var _gaq = _gaq || [];
+     _gaq.push(['_setAccount', 'UA-18538886-4']);
+     _gaq.push(['_trackPageview']);
+
+     (function() {
+       var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+       ga.src = 'https://ssl.google-analytics.com/ga.js';
+       var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+     })();
+</script>
+</body>
+</html>
