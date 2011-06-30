@@ -58,13 +58,13 @@ function init() {
         var cbs = ext.listeners[ext.ADD_TWEETS_LISTENER];
         var cbs_after = ext.listeners[ext.ADD_TWEETS_LISTENER_AFTER];
         for (var i = 0, l = cbs.length; i < l; i += 1) {
-            cbs[i](tweet_obj, container);
+            cbs[i](tweet_obj, view);
         }
         
         var ret = ui_main_add_tweets(view, tweet_obj, reversion, ignore_kismet);
 
         for (var i = 0, l = cbs_after.length; i < l; i += 1) {
-            cbs_after[i](tweet_obj, container);
+            cbs_after[i](tweet_obj, view);
         }
         return ret;
     };
