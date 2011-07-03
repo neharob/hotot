@@ -43,6 +43,8 @@ exts_info: {},
 
 exts_enabled: [], 
 
+extra_exts_path: {},
+
 prefs: null,
 
 init: 
@@ -115,6 +117,13 @@ function init() {
 
 init_exts:
 function init_exts() {
+    // extra extension's directory name must match it's id
+    for (var i = 0, l = ext.extras.length; i < l; i++) {
+        var path = ext.extras[i].replace(/\/entry.js$/, "");
+        var id = path.match("[^/]+$");
+        ext.extra_exts_path[id] = path;
+    }
+
     for (var key in ext) {
         // Extension package MUST be Capital
         // and MUST have two methods named 'enable' and 'disable'
@@ -125,11 +134,15 @@ function init_exts() {
 
             var extension = ext[key];
 
-			var icon;
+            var icon;
             if (typeof extension.icon == 'undefined') {
                 icon = 'image/ic64_exts.png';
             } else {
-                icon = 'ext/' + extension.id + '/' + extension.icon;
+                if (ext.extra_exts_path[extension.id]) {
+                    icon = ext.extra_exts_path[extension.id] + '/' + extension.icon;
+                } else {
+                    icon = 'ext/' + extension.id + '/' + extension.icon;
+                }
             }
 
             if (!ext.exts_info.hasOwnProperty(extension.id)) {
@@ -229,7 +242,14 @@ function unregister_listener(type, callback) {
 
 add_exts_menuitem:
 function add_exts_menuitem(id, icon, label, callback) {
-    $('#exts_menu').append('<li><a class="'+id+'" style="background-image:url(ext/'+icon+');" href="javascript:void(0);" title="'+label+'">'+label+'</a></li>');
+    var ext_id = icon.match('^[^/]+');
+    var icon_path;
+    if (ext.extra_exts_path[ext_id]) {
+        icon_path = ext.extra_exts_path[ext_id].replace(/[^\/]+$/, '') + icon;
+    } else {
+        icon_path = 'ext/' + icon;
+    }
+    $('#exts_menu').append('<li><a class="'+id+'" style="background-image:url('+icon_path+');" href="javascript:void(0);" title="'+label+'">'+label+'</a></li>');
     $('#exts_menu .'+id).click(callback);
 },
 
